@@ -1,0 +1,15 @@
+[package]
+name = "neohub-mqtt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+log = "0.4"
+neohub = "0.2"
+pretty_env_logger = "0.4"
+rumqttc = "0.16"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+time = { version = "0.3", features = ["serde", "serde-well-known"] }
+tokio = { version = "1" }
