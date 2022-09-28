@@ -1,0 +1,29 @@
+# /etc/telegraf/telegraf.d/neohub.conf
+[[inputs.mqtt_consumer]]
+  servers = ["tcp://127.0.0.1:1883"]
+  topics = ["neohub/#"]
+  name_override = "neohub"
+
+  data_format = "json_v2"
+  [[inputs.mqtt_consumer.json_v2]]
+    timestamp_path = "publishTime"
+    timestamp_format = "2006-01-02T15:04:05.000000000Z"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "tempActual"
+      type = "float"
+      rename = "temp"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "tempSet"
+      type = "float"
+      rename = "temp_set"
+    [[inputs.mqtt_consumer.json_v2.field]]
+      path = "heatOn"
+      type = "bool"
+      rename = "heat_on"
+    [[inputs.mqtt_consumer.json_v2.tag]]
+      path = "deviceIdx"
+      type = "int"
+      rename = "device_idx"
+    [[inputs.mqtt_consumer.json_v2.tag]]
+      path = "zoneName"
+      rename = "zone_name"
