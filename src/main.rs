@@ -6,7 +6,7 @@ use log::{debug, info, trace, warn};
 use rumqttc::{Event, EventLoop, Incoming, MqttOptions, QoS};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -83,13 +83,10 @@ async fn main() -> Result<()> {
     tokio::spawn(log_for_loop(mqtt_loop));
 
     loop {
-        let data: LiveData = timeout(
-            Duration::from_secs(10),
-            neohub.command_void(neohub::commands::GET_LIVE_DATA),
-        )
-        .await
-        .context("waiting for neohub")?
-        .context("fetching live data from neohub")?;
+        let data: LiveData = neohub
+            .command_void(neohub::commands::GET_LIVE_DATA)
+            .await
+            .context("fetching live data from neohub")?;
         let now = OffsetDateTime::now_utc();
 
         for device in data.devices {
