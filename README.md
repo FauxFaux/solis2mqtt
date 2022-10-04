@@ -46,6 +46,9 @@ neohub_mqtt > mqtt broker acknowledged a publication (we're all good)
    events in memory for "minutes". That is, short outages of the broker will
    be tolerated, so long as there are no other errors at the same time.
 
+ * During an exit, such as is initiated by a hub error, the application will
+   make some effort to flush events to the broker.
+
 
 ### Example stack
 

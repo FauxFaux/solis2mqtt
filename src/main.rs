@@ -2,11 +2,12 @@ use std::env;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use log::{debug, info, trace, warn};
-use rumqttc::{Event, EventLoop, Incoming, MqttOptions, QoS};
+use log::{debug, error, info, trace, warn};
+use rumqttc::ConnectionError::MqttState;
+use rumqttc::{Event, EventLoop, Incoming, MqttOptions, Outgoing, QoS, StateError};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -80,13 +81,17 @@ async fn main() -> Result<()> {
         (10 /* minutes */ * 60) / 5 /* seconds per publish */ * 10, /* devices */
     );
 
-    tokio::spawn(log_for_loop(mqtt_loop));
+    let mqtt_loop = tokio::spawn(log_for_loop(mqtt_loop));
 
-    loop {
-        let data: LiveData = neohub
+    let err = loop {
+        let data: LiveData = match neohub
             .command_void(neohub::commands::GET_LIVE_DATA)
             .await
-            .context("fetching live data from neohub")?;
+            .context("fetching live data from neohub")
+        {
+            Ok(data) => data,
+            Err(e) => break e,
+        };
         let now = OffsetDateTime::now_utc();
 
         for device in data.devices {
@@ -111,7 +116,25 @@ async fn main() -> Result<()> {
         }
 
         sleep(Duration::from_secs(5)).await;
-    }
+    };
+    error!("neohub failed {err:?}, attempting to cleanup...");
+    info!("neohub disconnection: {:?}", neohub.disconnect().await);
+
+    info!("pausing to allow mqtt to flush...");
+    sleep(Duration::from_secs(5)).await;
+
+    info!("attempting to initiate a disconnect from the broker...");
+    // I *believe* this should queue behind real data but have not tried it.
+    mqtt.try_disconnect()
+        .context("asking mqtt to disconnect after an error")?;
+
+    info!("waiting for broker disconnect...");
+    timeout(Duration::from_secs(60), mqtt_loop)
+        .await
+        .context("waiting for mqtt to flush")?
+        .context("joining mqtt")?;
+
+    Err(err.context("exiting as there was an error talking to the hub"))
 }
 
 fn env_var(name: &'static str) -> Result<String> {
@@ -131,6 +154,7 @@ async fn log_for_loop(mut ev: EventLoop) {
         ErrPrinted,
     }
 
+    let mut disconnecting = false;
     let mut state = State::Unknown;
     loop {
         let res = ev.poll().await;
@@ -139,6 +163,17 @@ async fn log_for_loop(mut ev: EventLoop) {
             Ok(Event::Incoming(Incoming::PubAck(_))) if state != State::AckPrinted => {
                 info!("mqtt broker acknowledged a publication (we're all good)");
                 state = State::AckPrinted;
+            }
+            Ok(Event::Outgoing(Outgoing::Disconnect)) if !disconnecting => {
+                info!("asked mqtt broker to disconnect us");
+                disconnecting = true;
+            }
+            Ok(Event::Incoming(Incoming::Disconnect)) if disconnecting => break,
+            // mosquitto appears to just drop the connection, generating a:
+            // MqttState(Io(Custom { kind: ConnectionAborted, error: "connection closed by peer" }))
+            Err(MqttState(StateError::Io(e))) if disconnecting => {
+                warn!("connection error during broker disconnect, assuming intention was to disconnect: {e:?}");
+                break;
             }
             Ok(some) if state == State::ErrPrinted => {
                 warn!(
