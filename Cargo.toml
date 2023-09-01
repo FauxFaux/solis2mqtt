@@ -1,12 +1,11 @@
 [package]
-name = "neohub-mqtt"
+name = "solis2mqtt"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1"
 log = "0.4"
-neohub = "0.3"
 pretty_env_logger = "0.5"
 rumqttc = "0.22"
 serde = { version = "1", features = ["derive"] }

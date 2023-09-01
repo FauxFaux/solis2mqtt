@@ -1,5 +1,0 @@
-[[outputs.influxdb_v2]]
-urls = ["http://10.6.1.6:8086"]
-token = "SSBMT1ZFIEhPUlNFUywgQkVTVCBPRiBBTEwgVEhFIEFOSU1BTFMsIEkgTE9WRSBIT1JTRVMsIFlPVSBUSElFRgo="
-organization = "a1f815268f0bb7"
-bucket = "house"
